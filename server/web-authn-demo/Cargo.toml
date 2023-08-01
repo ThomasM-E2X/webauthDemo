@@ -10,3 +10,4 @@ actix-web = "4"
 actix-cors = "0.6.4"
 rand = "0.8.5"
 serde = {version="1.0.152",features = ["derive"] }
+base64 = "0.21.2"

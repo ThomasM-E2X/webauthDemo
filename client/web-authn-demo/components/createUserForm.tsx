@@ -80,10 +80,12 @@ function CreateUserForm({}: Props) {
         method: "post",
         headers: {
           "Access-Control-Allow-Methods": "*",
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          publicKey: btoa(JSON.stringify(credential)),
-        }),
+        body: JSON.stringify(credential),
+        // body: JSON.stringify({
+        //   publicKey: btoa(String.fromCharCode.apply(null, publicKey)),
+        // }),
       }
     );
 
