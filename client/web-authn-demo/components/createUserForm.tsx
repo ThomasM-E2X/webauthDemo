@@ -16,22 +16,22 @@ function CreateUserForm({}: Props) {
   const [canUseAuthn, setCanUseAuthn] = useState(false);
   const [error, seterror] = useState<string | undefined>();
 
-  useEffect(() => {
-    if (
-      window.PublicKeyCredential &&
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
-      PublicKeyCredential.isConditionalMediationAvailable
-    ) {
-      Promise.all([
-        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(),
-        PublicKeyCredential.isConditionalMediationAvailable(),
-      ]).then((results) => {
-        if (results.every((r) => r === true)) {
-          setCanUseAuthn(true);
-        }
-      });
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (
+  //     window.PublicKeyCredential &&
+  //     PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
+  //     PublicKeyCredential.isConditionalMediationAvailable
+  //   ) {
+  //     Promise.all([
+  //       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(),
+  //       PublicKeyCredential.isConditionalMediationAvailable(),
+  //     ]).then((results) => {
+  //       if (results.every((r) => r === true)) {
+  //         setCanUseAuthn(true);
+  //       }
+  //     });
+  //   }
+  // }, [])
 
   async function handleSubmit(e: FormEvent<CreateForm>) {
     e.preventDefault();
@@ -54,7 +54,7 @@ function CreateUserForm({}: Props) {
 
     window.crypto.getRandomValues(userId);
 
-    let credential = await navigator.credentials.create({
+    let credential = (await navigator.credentials.create({
       publicKey: {
         challenge: bytes,
         rp: {
@@ -72,7 +72,17 @@ function CreateUserForm({}: Props) {
           requireResidentKey: true,
         },
       },
-    });
+    })) as Credential & { response: Record<string, any> };
+
+    const clientDataJson = JSON.parse(
+      new TextDecoder("utf-8").decode(credential?.response?.clientDataJSON)
+    );
+
+    const publicKey = new TextDecoder("utf-8").decode(
+      credential.response.getPublicKey()
+    );
+    console.log("clientData", clientDataJson);
+    console.log("public key", publicKey);
 
     const savedPublicKey = await fetch(
       "http://localhost:8080/save_public_key",
@@ -82,16 +92,15 @@ function CreateUserForm({}: Props) {
           "Access-Control-Allow-Methods": "*",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(credential),
-        // body: JSON.stringify({
-        //   publicKey: btoa(String.fromCharCode.apply(null, publicKey)),
-        // }),
+        body: JSON.stringify({
+          id: credential?.id,
+          clientDataJson,
+          publicKey,
+        }),
       }
     );
 
     console.log(savedPublicKey);
-
-    // }
   }
 
   return (
