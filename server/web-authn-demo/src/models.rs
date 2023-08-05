@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use actix_web::{HttpResponse, HttpResponseBuilder};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -49,9 +50,39 @@ pub struct ClientDataJson {
     pub t: String,
 }
 
+impl ClientDataJson {
+    /// Validates the client data json object by checking the incoming challenge and that
+    /// the correct operation is being performed
+    pub fn validate(
+        &self,
+        challenge_map: &mut HashMap<String, String>,
+        incoming_challenge_id: &String,
+    ) -> Result<(), HttpResponseBuilder> {
+        //Make sure incoming challenge matches one we sent out for that session
+        match challenge_map.get(incoming_challenge_id) {
+            Some(challenge) => {
+                if self.challenge != *challenge {
+                    return Err(HttpResponse::Unauthorized());
+                }
+            }
+            None => {
+                return Err(HttpResponse::NotFound());
+            }
+        }
+
+        challenge_map.remove(incoming_challenge_id);
+
+        // check is the correct operation
+        if (self.t != "webauthn.create") {
+            return Err(HttpResponse::BadRequest());
+        }
+        Ok(())
+    }
+}
+
 pub struct AppData {
     pub userDb: Arc<Mutex<Vec<User>>>,
-    pub challenge_map: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    pub challenge_map: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl AppData {

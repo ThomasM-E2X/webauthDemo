@@ -1,6 +1,9 @@
 "use client";
 
-import React, { FormEvent, useEffect, useState } from "react";
+import { AuthContext } from "@/app/context/authContext";
+import React, { FormEvent, useContext, useEffect, useState } from "react";
+
+import { useRouter } from "next/navigation";
 
 interface FormElements extends HTMLFormControlsCollection {
   firstName: HTMLInputElement;
@@ -15,31 +18,21 @@ type Props = {};
 function CreateUserForm({}: Props) {
   const [canUseAuthn, setCanUseAuthn] = useState(false);
   const [error, seterror] = useState<string | undefined>();
+  const router = useRouter();
 
-  // useEffect(() => {
-  //   if (
-  //     window.PublicKeyCredential &&
-  //     PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
-  //     PublicKeyCredential.isConditionalMediationAvailable
-  //   ) {
-  //     Promise.all([
-  //       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(),
-  //       PublicKeyCredential.isConditionalMediationAvailable(),
-  //     ]).then((results) => {
-  //       if (results.every((r) => r === true)) {
-  //         setCanUseAuthn(true);
-  //       }
-  //     });
-  //   }
-  // }, [])
+  const authContext = useContext(AuthContext);
+
+  useEffect(() => {
+    if (authContext && authContext.isAuth) {
+      router.push("/");
+    }
+  }, [authContext, router]);
 
   async function handleSubmit(e: FormEvent<CreateForm>) {
     e.preventDefault();
     const { firstName, lastName } = e.currentTarget.elements;
 
-    // if (canUseAuthn) {
-
-    let challengeBytes = await fetch(
+    let challengeResponse = await fetch(
       "http://localhost:8080/generate_challenge",
       {
         method: "Get",
@@ -49,14 +42,15 @@ function CreateUserForm({}: Props) {
       }
     );
 
-    const bytes = await challengeBytes.arrayBuffer();
+    const { challenge_id, challenge } = await challengeResponse.json();
+
     let userId = new Uint8Array(16);
 
     window.crypto.getRandomValues(userId);
 
     let credential = (await navigator.credentials.create({
       publicKey: {
-        challenge: bytes,
+        challenge: new Uint8Array(challenge),
         rp: {
           id: "localhost",
           name: "localHost",
@@ -75,17 +69,15 @@ function CreateUserForm({}: Props) {
     })) as Credential & { response: Record<string, any> };
 
     const clientDataJson = JSON.parse(
-      new TextDecoder("utf-8").decode(credential?.response?.clientDataJSON)
+      new TextDecoder().decode(credential?.response?.clientDataJSON)
     );
 
     const publicKey = new TextDecoder("utf-8").decode(
       credential.response.getPublicKey()
     );
-    console.log("clientData", clientDataJson);
-    console.log("public key", publicKey);
 
     const savedPublicKey = await fetch(
-      "http://localhost:8080/save_public_key",
+      `http://localhost:8080/save_public_key/${challenge_id}`,
       {
         method: "post",
         headers: {
@@ -100,7 +92,12 @@ function CreateUserForm({}: Props) {
       }
     );
 
-    console.log(savedPublicKey);
+    if (savedPublicKey.status !== 200) {
+      seterror("Server failed to authenticate passKey");
+      return;
+    }
+
+    authContext?.setIsAuth(true);
   }
 
   return (
