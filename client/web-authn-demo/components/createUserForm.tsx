@@ -85,9 +85,10 @@ function CreateUserForm({}: Props) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: credential?.id,
+          credentialId: credential?.id,
           clientDataJson,
           publicKey,
+          userId: new TextDecoder().decode(userId),
         }),
       }
     );

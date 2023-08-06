@@ -12,3 +12,4 @@ rand = "0.8.5"
 serde = {version="1.0.152",features = ["derive"] }
 base64 = "0.21.2"
 uuid = {version="1.4.1", features = ["v4"]}
+ring = "0.16.20"

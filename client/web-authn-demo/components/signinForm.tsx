@@ -15,7 +15,7 @@ type Props = {};
 function SigninForm({}: Props) {
   useEffect(() => {
     const requestChallenge = async () => {
-      let challengeBytes = await fetch(
+      let challengeResponse = await fetch(
         "http://localhost:8080/generate_challenge",
         {
           method: "Get",
@@ -25,36 +25,56 @@ function SigninForm({}: Props) {
         }
       );
 
-      const bytes = await challengeBytes.arrayBuffer();
+      let { challenge, challenge_id } = await challengeResponse.json();
+
       let userId = new Uint8Array(16);
 
       window.crypto.getRandomValues(userId);
 
-      const creds = await window.navigator.credentials.get({
+      const creds = (await window.navigator.credentials.get({
         publicKey: {
-          challenge: bytes,
+          challenge: new Uint8Array(challenge),
           allowCredentials: [],
           rpId: "localhost",
         },
-      });
+      })) as unknown as Credential & { response: Record<string, any> };
+      const textDecoder = new TextDecoder();
 
-      const json = JSON.parse(
-        new TextDecoder().decode(creds.response.clientDataJSON)
+      const clientDataJson = JSON.parse(
+        textDecoder.decode(creds.response.clientDataJSON)
       );
 
+      const signature = textDecoder.decode(creds.response.signature);
+
+      const authenticatorData = textDecoder.decode(
+        creds.response.authenticatorData
+      );
+
+      const userHandle = textDecoder.decode(creds.response.userHandle);
+
       let verifyResponse = await fetch(
-        "http://localhost:8080/verify_public_key",
+        `http://localhost:8080/verify_public_key/${challenge_id}`,
         {
           method: "POST",
           headers: {
             "Access-Control-Allow-Methods": "*",
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(creds),
+          body: JSON.stringify({
+            clientDataJson,
+            signature,
+            authenticatorData,
+            userHandle,
+          }),
         }
       ); //send key to server for
 
-      const res2 = verifyResponse;
+      if (verifyResponse.status !== 200) {
+        console.log("Server failed to authenticate passKey");
+        return;
+      }
+
+      // authContext?.setIsAuth(true);
     };
 
     requestChallenge();
