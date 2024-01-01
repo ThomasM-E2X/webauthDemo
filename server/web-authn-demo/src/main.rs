@@ -1,7 +1,10 @@
+//TODO: the signature needs to be decoded from asn.1 to something normal
+
 mod models;
 
 use crate::models::{
-    AppData, GenerateChallengeRes, SavePublicKeyReq, User, VerifyPublicKeyReq, WebAuthnType,
+    AppData, ClientDataJson, GenerateChallengeRes, SavePublicKeyReq, User, VerifyPublicKeyReq,
+    WebAuthnType,
 };
 use actix_cors::Cors;
 use actix_web::{
@@ -12,6 +15,10 @@ use actix_web::{
 use base64::{engine::general_purpose, Engine as _};
 use rand::thread_rng;
 use rand::Rng;
+use ring::{
+    digest,
+    signature::{self, UnparsedPublicKey, ECDSA_P256_SHA256_FIXED},
+};
 
 #[get("/generate_challenge")]
 async fn generate_challenge(data: web::Data<AppData>) -> impl Responder {
@@ -64,12 +71,60 @@ async fn verify_public_key(
     let incoming_challenge_id = path.into_inner();
     let mut challenge_map = data.challenge_map.lock().expect("failed to lock");
 
-    match res.clientDataJson.validate(
+    let r = general_purpose::URL_SAFE
+        .decode(&res.clientDataJson)
+        .unwrap();
+
+    let s = String::from_utf8(r).unwrap();
+
+    println!("string {:?}", s);
+
+    let clientData: ClientDataJson = serde_json::from_str(&s).unwrap();
+
+    println!("clientData {:?}", clientData);
+
+    match clientData.validate(
         &mut challenge_map,
         &incoming_challenge_id,
         WebAuthnType::GET,
     ) {
-        Ok(_) => HttpResponse::Ok(),
+        Ok(_) => match data.userDb.lock() {
+            Ok(users) => {
+                println!("made it here");
+                let user = users
+                    .get(&res.userHandle.clone())
+                    .expect("failed to get user ");
+
+                let base64PubKey = general_purpose::STANDARD.decode(&user.pubKey).unwrap();
+
+                println!("key {:?}", base64PubKey);
+                let public_key = UnparsedPublicKey::new(
+                    &ECDSA_P256_SHA256_FIXED,
+                    // user.pubKey.bytes().collect::<Vec<u8>>(),
+                    base64PubKey,
+                );
+
+                let mut context = digest::Context::new(&digest::SHA256);
+
+                context.update(res.clientDataJson.as_bytes());
+
+                let message = [
+                    res.authenticatorData.bytes().collect::<Vec<u8>>(),
+                    context.finish().as_ref().to_vec(),
+                ]
+                .concat();
+
+                let result =
+                    public_key.verify(&message, &res.signature.bytes().collect::<Vec<u8>>());
+
+                match result {
+                    Ok(_) => HttpResponse::Ok(),
+                    Err(_) => HttpResponse::Unauthorized(),
+                }
+            }
+            Err(_) => HttpResponse::InternalServerError(),
+        },
+
         Err(http_response) => http_response,
     }
 }

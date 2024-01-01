@@ -2,6 +2,7 @@
 
 import { AuthContext } from "@/app/context/authContext";
 import React, { FormEvent, useContext, useEffect, useState } from "react";
+import { encode, decode } from "js-base64";
 
 import { useRouter } from "next/navigation";
 
@@ -60,7 +61,7 @@ function CreateUserForm({}: Props) {
           name: `${firstName.value}${lastName.value}`,
           displayName: `${firstName.value} ${lastName.value} `,
         },
-        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        pubKeyCredParams: [{ type: "public-key", alg: -257 }],
         authenticatorSelection: {
           authenticatorAttachment: "platform",
           requireResidentKey: true,
@@ -72,9 +73,17 @@ function CreateUserForm({}: Props) {
       new TextDecoder().decode(credential?.response?.clientDataJSON)
     );
 
-    const publicKey = new TextDecoder("utf-8").decode(
-      credential.response.getPublicKey()
-    );
+    const r = encode(credential.response.clientDataJSON);
+    const g = decode(r);
+
+    console.log(g, r);
+
+    // JSON.parse(new TextDecoder().decode(g));
+
+    const publicKey = encode(credential.response.getPublicKey());
+
+    console.log("pub key", credential.response.getPublicKey());
+    console.log("pub key2", publicKey);
 
     const savedPublicKey = await fetch(
       `http://localhost:8080/save_public_key/${challenge_id}`,

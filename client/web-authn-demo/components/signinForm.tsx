@@ -1,5 +1,6 @@
 "use client";
 
+import { encode } from "js-base64";
 import React, { FormEvent, useEffect, useState } from "react";
 
 interface FormElements extends HTMLFormControlsCollection {
@@ -10,9 +11,22 @@ interface CreateForm extends HTMLFormElement {
   readonly elements: FormElements;
 }
 
+// function convertASN1toRaw(signatureBuffer: ArrayBuffer) {
+//   // Convert signature from ASN.1 sequence to "raw" format
+//   const usignature = new Uint8Array(signatureBuffer);
+//   const rStart = usignature[4] === 0 ? 5 : 4;
+//   const rEnd = rStart + 32;
+//   const sStart = usignature[rEnd + 2] === 0 ? rEnd + 3 : rEnd + 2;
+//   const r = usignature.slice(rStart, rEnd);
+//   const s = usignature.slice(sStart);
+//   return new Uint8Array([...r, ...s]);
+// }
+
 type Props = {};
 
 function SigninForm({}: Props) {
+  const [signInFailed, setsignInFailed] = useState<boolean | null>(null);
+
   useEffect(() => {
     const requestChallenge = async () => {
       let challengeResponse = await fetch(
@@ -27,10 +41,6 @@ function SigninForm({}: Props) {
 
       let { challenge, challenge_id } = await challengeResponse.json();
 
-      let userId = new Uint8Array(16);
-
-      window.crypto.getRandomValues(userId);
-
       const creds = (await window.navigator.credentials.get({
         publicKey: {
           challenge: new Uint8Array(challenge),
@@ -38,17 +48,25 @@ function SigninForm({}: Props) {
           rpId: "localhost",
         },
       })) as unknown as Credential & { response: Record<string, any> };
-      const textDecoder = new TextDecoder();
+      const textDecoder = new TextDecoder("utf-8");
 
-      const clientDataJson = JSON.parse(
-        textDecoder.decode(creds.response.clientDataJSON)
-      );
+      // const clientDataJson = JSON.parse(
+      //   textDecoder.decode(creds.response.clientDataJSON)
+      // );
 
       const signature = textDecoder.decode(creds.response.signature);
+
+      console.log(new Uint8Array(creds.response.clientDataJSON));
 
       const authenticatorData = textDecoder.decode(
         creds.response.authenticatorData
       );
+
+      console.log("auth data", encode(authenticatorData));
+
+      const clientDataJson = encode(creds.response.clientDataJSON);
+
+      console.log("client data json", clientDataJson);
 
       const userHandle = textDecoder.decode(creds.response.userHandle);
 
@@ -71,7 +89,7 @@ function SigninForm({}: Props) {
 
       if (verifyResponse.status !== 200) {
         console.log("Server failed to authenticate passKey");
-        return;
+        setsignInFailed(true);
       }
 
       // authContext?.setIsAuth(true);
@@ -115,6 +133,8 @@ function SigninForm({}: Props) {
           Login
         </button>
       </div>
+
+      {signInFailed && <p>Error could not be authenticated</p>}
     </form>
   );
 }

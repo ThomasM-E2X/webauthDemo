@@ -4,12 +4,13 @@ use std::{
 };
 
 use actix_web::{HttpResponse, HttpResponseBuilder};
+use ring::digest;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct User {
-    credId: String,
-    pubKey: String,
+    pub credId: String,
+    pub pubKey: String,
 }
 
 impl User {
@@ -46,7 +47,7 @@ pub struct SavePublicKeyReq {
 
 #[derive(Deserialize, Debug)]
 pub struct VerifyPublicKeyReq {
-    pub clientDataJson: ClientDataJson,
+    pub clientDataJson: String,
     pub signature: String,
     pub authenticatorData: String,
     pub userHandle: String,
@@ -58,6 +59,7 @@ pub struct ClientDataJson {
     pub origin: String,
     #[serde(rename = "type")]
     pub t: String,
+    pub androidPackageName: Option<String>,
 }
 
 pub enum WebAuthnType {
@@ -102,6 +104,19 @@ impl ClientDataJson {
             return Err(HttpResponse::BadRequest());
         }
         Ok(())
+    }
+
+    pub fn sha_256_hash(&self) -> Vec<u8> {
+        let mut context = digest::Context::new(&digest::SHA256);
+
+        let json_str = format!(
+            r#"{{"challenge":"{}","origin":"{}","type":"{}"}}"#,
+            self.challenge, self.origin, self.t
+        );
+
+        context.update(json_str.as_bytes());
+
+        context.finish().as_ref().to_vec()
     }
 }
 
