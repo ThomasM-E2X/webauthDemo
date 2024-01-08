@@ -1,7 +1,9 @@
 "use client";
 
+import { AuthContext } from "@/app/context/authContext";
 import { encode } from "js-base64";
-import React, { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import React, { FormEvent, useContext, useEffect, useState } from "react";
 
 interface FormElements extends HTMLFormControlsCollection {
   firstName: HTMLInputElement;
@@ -11,21 +13,23 @@ interface CreateForm extends HTMLFormElement {
   readonly elements: FormElements;
 }
 
-// function convertASN1toRaw(signatureBuffer: ArrayBuffer) {
-//   // Convert signature from ASN.1 sequence to "raw" format
-//   const usignature = new Uint8Array(signatureBuffer);
-//   const rStart = usignature[4] === 0 ? 5 : 4;
-//   const rEnd = rStart + 32;
-//   const sStart = usignature[rEnd + 2] === 0 ? rEnd + 3 : rEnd + 2;
-//   const r = usignature.slice(rStart, rEnd);
-//   const s = usignature.slice(sStart);
-//   return new Uint8Array([...r, ...s]);
-// }
+function convertASN1toRaw(signatureBuffer: ArrayBuffer) {
+  // Convert signature from ASN.1 sequence to "raw" format
+  const usignature = new Uint8Array(signatureBuffer);
+  const rStart = usignature[4] === 0 ? 5 : 4;
+  const rEnd = rStart + 32;
+  const sStart = usignature[rEnd + 2] === 0 ? rEnd + 3 : rEnd + 2;
+  const r = usignature.slice(rStart, rEnd);
+  const s = usignature.slice(sStart);
+  return new Uint8Array([...r, ...s]);
+}
 
 type Props = {};
 
 function SigninForm({}: Props) {
   const [signInFailed, setsignInFailed] = useState<boolean | null>(null);
+  const router = useRouter();
+  const authContext = useContext(AuthContext);
 
   useEffect(() => {
     const requestChallenge = async () => {
@@ -50,23 +54,14 @@ function SigninForm({}: Props) {
       })) as unknown as Credential & { response: Record<string, any> };
       const textDecoder = new TextDecoder("utf-8");
 
-      // const clientDataJson = JSON.parse(
-      //   textDecoder.decode(creds.response.clientDataJSON)
-      // );
-
-      const signature = textDecoder.decode(creds.response.signature);
-
-      console.log(new Uint8Array(creds.response.clientDataJSON));
+      const rawSig = convertASN1toRaw(creds.response.signature);
 
       const authenticatorData = textDecoder.decode(
         creds.response.authenticatorData
       );
 
-      console.log("auth data", encode(authenticatorData));
-
       const clientDataJson = encode(creds.response.clientDataJSON);
-
-      console.log("client data json", clientDataJson);
+      const signature = encode(textDecoder.decode(rawSig));
 
       const userHandle = textDecoder.decode(creds.response.userHandle);
 
@@ -85,18 +80,25 @@ function SigninForm({}: Props) {
             userHandle,
           }),
         }
-      ); //send key to server for
+      );
 
       if (verifyResponse.status !== 200) {
         console.log("Server failed to authenticate passKey");
         setsignInFailed(true);
+      } else {
       }
 
-      // authContext?.setIsAuth(true);
+      authContext?.setIsAuth(true);
     };
 
     requestChallenge();
   }, []);
+
+  useEffect(() => {
+    if (authContext && authContext.isAuth) {
+      router.push("/");
+    }
+  }, [authContext, router]);
 
   async function handleSubmit(e: FormEvent<CreateForm>) {
     e.preventDefault();

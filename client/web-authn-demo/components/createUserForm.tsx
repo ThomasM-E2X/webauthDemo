@@ -54,14 +54,14 @@ function CreateUserForm({}: Props) {
         challenge: new Uint8Array(challenge),
         rp: {
           id: "localhost",
-          name: "localHost",
+          name: "localhost",
         },
         user: {
           id: userId,
           name: `${firstName.value}${lastName.value}`,
           displayName: `${firstName.value} ${lastName.value} `,
         },
-        pubKeyCredParams: [{ type: "public-key", alg: -257 }],
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
         authenticatorSelection: {
           authenticatorAttachment: "platform",
           requireResidentKey: true,
@@ -73,17 +73,7 @@ function CreateUserForm({}: Props) {
       new TextDecoder().decode(credential?.response?.clientDataJSON)
     );
 
-    const r = encode(credential.response.clientDataJSON);
-    const g = decode(r);
-
-    console.log(g, r);
-
-    // JSON.parse(new TextDecoder().decode(g));
-
     const publicKey = encode(credential.response.getPublicKey());
-
-    console.log("pub key", credential.response.getPublicKey());
-    console.log("pub key2", publicKey);
 
     const savedPublicKey = await fetch(
       `http://localhost:8080/save_public_key/${challenge_id}`,

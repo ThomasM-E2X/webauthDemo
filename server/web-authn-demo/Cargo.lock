@@ -261,6 +261,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "asn1"
+version = "0.15.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae3ecbce89a22627b5e8e6e11d69715617138290289e385cde773b1fe50befdb"
+dependencies = [
+ "asn1_derive",
+]
+
+[[package]]
+name = "asn1_der"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "155a5a185e42c6b77ac7b88a15143d930a9e9727a5b7b77eed417404ab15c247"
+
+[[package]]
+name = "asn1_derive"
+version = "0.15.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "861af988fac460ac69a09f41e6217a8fb9178797b76fcc9478444be6a59be19c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.28",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -983,6 +1009,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "signature"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
+
+[[package]]
 name = "slab"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1256,11 +1288,14 @@ version = "0.1.0"
 dependencies = [
  "actix-cors",
  "actix-web",
+ "asn1",
+ "asn1_der",
  "base64",
  "rand",
  "ring",
  "serde",
  "serde_json",
+ "signature",
  "uuid",
 ]
 

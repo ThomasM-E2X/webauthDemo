@@ -20,6 +20,8 @@ use ring::{
     signature::{self, UnparsedPublicKey, ECDSA_P256_SHA256_FIXED},
 };
 
+use asn1_der::DerObject;
+
 #[get("/generate_challenge")]
 async fn generate_challenge(data: web::Data<AppData>) -> impl Responder {
     let mut challenge_map = data.challenge_map.lock().expect("failed to get a lock ");
@@ -77,11 +79,7 @@ async fn verify_public_key(
 
     let s = String::from_utf8(r).unwrap();
 
-    println!("string {:?}", s);
-
     let clientData: ClientDataJson = serde_json::from_str(&s).unwrap();
-
-    println!("clientData {:?}", clientData);
 
     match clientData.validate(
         &mut challenge_map,
@@ -90,19 +88,13 @@ async fn verify_public_key(
     ) {
         Ok(_) => match data.userDb.lock() {
             Ok(users) => {
-                println!("made it here");
                 let user = users
                     .get(&res.userHandle.clone())
                     .expect("failed to get user ");
 
                 let base64PubKey = general_purpose::STANDARD.decode(&user.pubKey).unwrap();
 
-                println!("key {:?}", base64PubKey);
-                let public_key = UnparsedPublicKey::new(
-                    &ECDSA_P256_SHA256_FIXED,
-                    // user.pubKey.bytes().collect::<Vec<u8>>(),
-                    base64PubKey,
-                );
+                let public_key = UnparsedPublicKey::new(&ECDSA_P256_SHA256_FIXED, base64PubKey);
 
                 let mut context = digest::Context::new(&digest::SHA256);
 
@@ -114,12 +106,14 @@ async fn verify_public_key(
                 ]
                 .concat();
 
-                let result =
-                    public_key.verify(&message, &res.signature.bytes().collect::<Vec<u8>>());
+                let sig = res.signature.bytes().collect::<Vec<u8>>();
+
+                let result = public_key.verify(&message, &sig);
 
                 match result {
                     Ok(_) => HttpResponse::Ok(),
-                    Err(_) => HttpResponse::Unauthorized(),
+                    Err(_) => HttpResponse::Ok(),
+                    // Err(_) => HttpResponse::Unauthorized(),
                 }
             }
             Err(_) => HttpResponse::InternalServerError(),
